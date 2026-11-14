@@ -58,7 +58,7 @@
       obj[l.slice(-1)[0]] = changes[k]
     }
     await GM.setValues(loaded)
-    delete localStorage.swiperNextDelayedChanges()
+    delete localStorage.swiperNextDelayedChanges
   }
   applyDelayedChanges()
 
@@ -1459,7 +1459,10 @@
             {value:4, name:"Box 3"},
           ])} as destination for wishlisted cards.<br>
           ${settingCheckbox("levelUpSlots", "When switching party, keep the Animus that didn't reach level 120")}
-          ${settingCheckbox("questsRecommendedFormation", "Remember best party for each gym")}
+          ${settingCheckbox("questsRecommendedFormation", "Remember best party for each gym")}<br>
+          <br>
+          If this user-script store a lot of data, your browser may not be optimized for saving up-to-date data multiple times fast and can waste a lot of RAM memory...<br>
+          ${settingCheckbox("delayChanges", "Delay saving changes")}
         </div>
       </div>
       <style>
