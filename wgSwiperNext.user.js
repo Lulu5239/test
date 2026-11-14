@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Waifugame swiper next
 // @namespace    http://tampermonkey.net/
-// @version      2026-10-29
+// @version      2026-11-14
 // @description  Move your cards to boxes from the swiper page, and various other sometimes helpful options.
 // @author       Lulu5239
 // @match        https://waifugame.com/*
@@ -2099,7 +2099,7 @@
       #reBuyList > span[data-status="done"] {
         background-color: #1a1;
       }
-      #reBuyList > span[data-status="late"] {
+      #reBuyList > span:is([data-status="late"], [data-status="error"]) {
         background-color: #a11;
       }
       #reBuyList > span[data-status="retry"] {
@@ -2201,12 +2201,12 @@
           }else{
             tooLate = true
             e.dataset.status = "late"
+            navigator.errData = data
           }
         }else if(firstData.status >= 400){
           tooLate = true
           e.dataset.status = "late"
         continue}
-        e.dataset.status = "done"
       }
     }, nextDay - +new Date())
   }else if(path==="/trader" && document.querySelector(".card.trader-catalog")){
