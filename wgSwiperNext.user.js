@@ -11,6 +11,8 @@
 // @run-at       document-end
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM.getValues
+// @grant        GM.setValues
 // ==/UserScript==
 
 (async ()=>{
@@ -34,6 +36,31 @@
     selectedCharisma: "4e4",
   }
   var settings = GM_getValue("settings") || {}
+  var delayChange = (key, value, obj)=>{
+    if(!settings.delayChanges && obj){
+      return GM_setValue(key.split(".", 1)[0], obj)
+    }
+    let changes = JSON.parse(localStorage.swiperNextDelayedChanges || "{}")
+    changes[key] = value
+    localStorage.swiperNextDelayedChanges = JSON.stringify(changes)
+  }
+  var applyDelayedChanges = swiperNext.applyDelayedChanges = async ()=>{
+    let changes = localStorage.swiperNextDelayedChanges
+    if(!changes){return}
+    changes = JSON.parse(changes)
+    let loaded = {}
+    for(let k in changes){loaded[k.split(".", 1)[0]] = null}
+    loaded = await GM.getValues(loaded)
+    for(let k in changes){
+      let l = k.split(".")
+      let obj = loaded[l.splice(0, 1)[0]]
+      for(let s of l.slice(0, -1)){obj = obj[s]}
+      obj[l.slice(-1)[0]] = changes[k]
+    }
+    await GM.setValues(loaded)
+    delete localStorage.swiperNextDelayedChanges()
+  }
+  applyDelayedChanges()
 
   var flavors = {
     "spicy": [27,28,29,30,31,32,33,34,47,65,66,67,69,76,79,85,86],
@@ -866,8 +893,8 @@
       }
     }
     
-    let cardActions = GM_getValue("cardActions") ? GM_getValue("cardActions") : localStorage["y_WG-cardActions"] ? JSON.parse(localStorage["y_WG-cardActions"]) : {}
-    let formations = GM_getValue("formations") ? GM_getValue("formations") : localStorage["y_WG-formations"] ? JSON.parse(localStorage["y_WG-formations"]) : {}
+    let cardActions = GM_getValue("cardActions", {})
+    let formations = GM_getValue("formations", {})
     let formation = Object.values(formations).find(team=>team.selected)
     let charisma = formation?.charisma
     let switchingFormation = false
@@ -916,7 +943,7 @@
       swiperNextButtons.dataset.section = "0"
     }
 
-    let wishedCards = GM_getValue("wishedCards") || []
+    let wishedCards = GM_getValue("wishedCards", [])
 
     let flirtAnyways; let expectedShownEncounter
     let originalPostServer = postServer
@@ -929,7 +956,7 @@
       }
       if(settings.keepActions && card.card){
         cardActions[card.card.id] = action
-        setTimeout(()=>GM_setValue("cardActions", cardActions), 0)
+        delayChange("cardActions."+card.card.id, action, cardActions)
       }
       let nextCard = document.querySelector(".tinder--cards :nth-child(1 of div.tinder--card:not(.removed))")
       let nextCardData = nextCard && $(nextCard).data("data")
@@ -961,7 +988,7 @@
         let gotCard = data.result.includes(" Card (\u2116 ")
         if(!settings.keepActions && gotCard && card.card && action!==1){
           cardActions[card.card.id] = action
-          GM_setValue("cardActions", cardActions)
+          delayChange("cardActions."+card.card.id, action, cardActions)
         }
         if(gotCard && card.card && settings.unwishlistObtainedCards && wishedCards.includes(""+card.card.id)){
           if(settings.unwishlistObtainedCards!=="confirm" || confirm(`Do you want to remove ${card.card.name} from your wishlist?`)){
