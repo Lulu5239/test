@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Waifugame swiper next
 // @namespace    http://tampermonkey.net/
-// @version      2026-11-14
+// @version      2026-11-15
 // @description  Move your cards to boxes from the swiper page, and various other sometimes helpful options.
 // @author       Lulu5239
 // @match        https://waifugame.com/*
@@ -2202,6 +2202,7 @@
           e.dataset.status = "late"
         continue}
         e.dataset.status = "requesting"
+        let t = +new Date()
         let firstData = await fetch("/buy", {
           method: "POST",
           body: JSON.stringify({
@@ -2221,7 +2222,8 @@
             e.dataset.status = "late"
           continue}else if(data.message?.startsWith("The Trader only has ")){
             e.dataset.status = "error"
-          continue}else if(firstData.status === 429){
+            n -= 1
+          }else if(firstData.status === 429){
             e.dataset.status = "retry"
             await new Promise(ok=>setTimeout(ok, 1000))
             n -= 1
@@ -2232,11 +2234,14 @@
             tooLate = true
             e.dataset.status = "late"
             navigator.errData = data
-          }
+          continue}
         }else if(firstData.status >= 400){
           tooLate = true
           e.dataset.status = "late"
+          navigator.errData = firstData
         continue}
+        let wait = t+500 - +new Date()
+        if(wait > 0){await new Promise(ok=>setTimeout(ok, wait))}
       }
     }, nextDay - +new Date())
   }else if(path==="/trader" && document.querySelector(".card.trader-catalog")){
