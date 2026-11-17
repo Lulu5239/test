@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Waifugame swiper next
 // @namespace    http://tampermonkey.net/
-// @version      2026-10-28
+// @version      2026-11-15
 // @description  Move your cards to boxes from the swiper page, and various other sometimes helpful options.
 // @author       Lulu5239
 // @match        https://waifugame.com/*
@@ -11,6 +11,8 @@
 // @run-at       document-end
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM.getValues
+// @grant        GM.setValues
 // ==/UserScript==
 
 (async ()=>{
@@ -34,6 +36,31 @@
     selectedCharisma: "4e4",
   }
   var settings = GM_getValue("settings") || {}
+  var delayChange = (key, value, obj)=>{
+    if(!settings.delayChanges && obj){
+      return GM_setValue(key.split(".", 1)[0], obj)
+    }
+    let changes = JSON.parse(localStorage.swiperNextDelayedChanges || "{}")
+    changes[key] = value
+    localStorage.swiperNextDelayedChanges = JSON.stringify(changes)
+  }
+  var applyDelayedChanges = swiperNext.applyDelayedChanges = async ()=>{
+    let changes = localStorage.swiperNextDelayedChanges
+    if(!changes){return}
+    changes = JSON.parse(changes)
+    let loaded = {}
+    for(let k in changes){loaded[k.split(".", 1)[0]] = null}
+    loaded = await GM.getValues(loaded)
+    for(let k in changes){
+      let l = k.split(".")
+      let obj = loaded[l.splice(0, 1)[0]]
+      for(let s of l.slice(0, -1)){obj = obj[s]}
+      obj[l.slice(-1)[0]] = changes[k]
+    }
+    await GM.setValues(loaded)
+    delete localStorage.swiperNextDelayedChanges
+  }
+  applyDelayedChanges()
 
   var flavors = {
     "spicy": [27,28,29,30,31,32,33,34,47,65,66,67,69,76,79,85,86],
@@ -866,8 +893,8 @@
       }
     }
     
-    let cardActions = GM_getValue("cardActions") ? GM_getValue("cardActions") : localStorage["y_WG-cardActions"] ? JSON.parse(localStorage["y_WG-cardActions"]) : {}
-    let formations = GM_getValue("formations") ? GM_getValue("formations") : localStorage["y_WG-formations"] ? JSON.parse(localStorage["y_WG-formations"]) : {}
+    let cardActions = GM_getValue("cardActions", {})
+    let formations = GM_getValue("formations", {})
     let formation = Object.values(formations).find(team=>team.selected)
     let charisma = formation?.charisma
     let switchingFormation = false
@@ -916,7 +943,7 @@
       swiperNextButtons.dataset.section = "0"
     }
 
-    let wishedCards = GM_getValue("wishedCards") || []
+    let wishedCards = GM_getValue("wishedCards", [])
 
     let flirtAnyways; let expectedShownEncounter
     let originalPostServer = postServer
@@ -929,7 +956,7 @@
       }
       if(settings.keepActions && card.card){
         cardActions[card.card.id] = action
-        setTimeout(()=>GM_setValue("cardActions", cardActions), 0)
+        delayChange("cardActions."+card.card.id, action, cardActions)
       }
       let nextCard = document.querySelector(".tinder--cards :nth-child(1 of div.tinder--card:not(.removed))")
       let nextCardData = nextCard && $(nextCard).data("data")
@@ -961,7 +988,7 @@
         let gotCard = data.result.includes(" Card (\u2116 ")
         if(!settings.keepActions && gotCard && card.card && action!==1){
           cardActions[card.card.id] = action
-          GM_setValue("cardActions", cardActions)
+          delayChange("cardActions."+card.card.id, action, cardActions)
         }
         if(gotCard && card.card && settings.unwishlistObtainedCards && wishedCards.includes(""+card.card.id)){
           if(settings.unwishlistObtainedCards!=="confirm" || confirm(`Do you want to remove ${card.card.name} from your wishlist?`)){
@@ -1366,7 +1393,7 @@
           ])} <i>(it won't appear if you used another XP item during the delay)</i><br>
           <br>
           ${settingCheckbox("highlightRewardingRaffles", "Highlight rewarding raffles")} <i>(this uses Lulu5239's website)</i><br>
-          ${settingCheckbox("removeInboxItemsLink", "Remove list of items in inbox messages from the homepage and items page")}
+          ${settingCheckbox("removeInboxItemsLink", "Remove list of items in inbox messages from some pages")}
         </div>
         <div data-page="keybinds">
           Pressing keys on your keyboard would select the associated action:<br>
@@ -1432,7 +1459,10 @@
             {value:4, name:"Box 3"},
           ])} as destination for wishlisted cards.<br>
           ${settingCheckbox("levelUpSlots", "When switching party, keep the Animus that didn't reach level 120")}
-          ${settingCheckbox("questsRecommendedFormation", "Remember best party for each gym")}
+          ${settingCheckbox("questsRecommendedFormation", "Remember best party for each gym")}<br>
+          <br>
+          If this user-script store a lot of data, your browser may not be optimized for saving up-to-date data multiple times fast and can waste a lot of RAM memory...<br>
+          ${settingCheckbox("delayChanges", "Delay saving changes")}
         </div>
       </div>
       <style>
@@ -1501,7 +1531,7 @@
           settings[key] = option.value
         }
         GM_setValue("settings", settings)
-        if(["showTopSimps", "cardsListFixedSize"].includes(key)){
+        if(["showTopSimps", "cardsListFixedSize", "removeInboxItemsLink"].includes(key)){
           showSuccessToast("Refresh the page to see the changes.")
         }
       })
@@ -1570,6 +1600,10 @@
       }
       ev.preventDefault()
     }, {capture: true})
+
+    if(settings.removeInboxItemsLink){
+      document.querySelector(".inbox-reward-summary-link")?.parentElement.remove()
+    }
   return}
 
   if(path==="/home"){
@@ -2095,7 +2129,7 @@
       #reBuyList > span[data-status="done"] {
         background-color: #1a1;
       }
-      #reBuyList > span[data-status="late"] {
+      #reBuyList > span:is([data-status="late"], [data-status="error"]) {
         background-color: #a11;
       }
       #reBuyList > span[data-status="retry"] {
@@ -2168,6 +2202,7 @@
           e.dataset.status = "late"
         continue}
         e.dataset.status = "requesting"
+        let t = +new Date()
         let firstData = await fetch("/buy", {
           method: "POST",
           body: JSON.stringify({
@@ -2187,7 +2222,8 @@
             e.dataset.status = "late"
           continue}else if(data.message?.startsWith("The Trader only has ")){
             e.dataset.status = "error"
-          continue}else if(firstData.status === 429){
+            n -= 1
+          }else if(firstData.status === 429){
             e.dataset.status = "retry"
             await new Promise(ok=>setTimeout(ok, 1000))
             n -= 1
@@ -2197,12 +2233,15 @@
           }else{
             tooLate = true
             e.dataset.status = "late"
-          }
+            navigator.errData = data
+          continue}
         }else if(firstData.status >= 400){
           tooLate = true
           e.dataset.status = "late"
+          navigator.errData = firstData
         continue}
-        e.dataset.status = "done"
+        let wait = t+500 - +new Date()
+        if(wait > 0){await new Promise(ok=>setTimeout(ok, wait))}
       }
     }, nextDay - +new Date())
   }else if(path==="/trader" && document.querySelector(".card.trader-catalog")){
