@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Waifugame swiper next
 // @namespace    http://tampermonkey.net/
-// @version      2026-11-20
+// @version      2026-11-21
 // @description  Move your cards to boxes from the swiper page, and various other sometimes helpful options.
 // @author       Lulu5239
 // @match        https://waifugame.com/*
@@ -2238,7 +2238,7 @@
             e.dataset.status = "late"
             navigator.errData = data
           continue}
-        }else if(firstData.status >= 400 && firstData.status < 500){
+        }else if(firstData.status >= 400){
           tooLate = true
           e.dataset.status = "late"
           navigator.errData = firstData
